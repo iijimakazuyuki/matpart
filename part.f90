@@ -1,34 +1,41 @@
-program part_1d
+program part
 	use matcrs_mod
-	use array
+	use bitset_mod
 	implicit none
 	type(matcrs) :: a
-	integer :: i, j, k, np, npp, si
+	type(bitset), allocatable :: p(:)
+	integer :: i, j, k, np
 	character(len=16) :: prefix, fname, fname2
 	!pn : 各点がどのプロセッサに所属するか
 	!pc : 各プロセッサが他のプロセッサから受け取る数
 	!ln : 各プロセッサ内でのローカルな添え字
-	integer, allocatable :: part(:), pn(:), pc(:,:), ln(:,:), ext(:,:), next(:)
+	integer, allocatable :: npp(:), pt(:), pn(:), pc(:,:), ln(:,:), ext(:,:), next(:)
 	type(matcrs_part) :: ap
 	
-	!分ける数, 接頭辞
 	read *, np, prefix
 	
 	a = read_matcrs_array()
 	
-	allocate(part(a%n), pn(a%n), pc(np,0:np), ln(np,a%n), ext(np,np), next(np))
+	allocate(p(np))
 	
-	!part初期化
-	do i=1, a%n
-		part(i) = i
+	do i=1, np
+		p(i) = new_bitset(a%n)
+		call read_bitset_list(p(i))
 	end do
 	
+	allocate(npp(np), pn(a%n), pc(np,0:np), ln(np,a%n), ext(np,np), next(np))
+	
+	npp = 0
+	
 	!pn初期化
-	si = 0
 	do i=1, np
-		npp = ceiling(real(i)*(a%n)/np) - si
-		pn(si+1:si+npp) = i
-		si = si + npp
+		j = 0
+		do
+			j = next_bitset(p(i), j)
+			if(j == 0) exit
+			pn(j) = i
+			npp(i) = npp(i) + 1
+		end do
 	end do
 	
 	!pc初期化
@@ -37,12 +44,14 @@ program part_1d
 	!ln初期化
 	ln = 0
 	
-	print *, "partitioning"
-	si = 0
+	!print *, "partitioning"
 	do i=1, np
-		npp = ceiling(real(i)*(a%n)/np) - si
+		allocate(pt(npp(i)))
 		
-		ap = part_matcrs(a, part(si+1:si+npp), part(si+1:si+npp))
+		j = 0
+		call assign_bitset_array(pt, j, p(i))
+		
+		ap = part_matcrs(a, pt, pt)
 		
 		write(fname, '(a,i2.2,".dat")') trim(prefix), i
 		
@@ -60,7 +69,7 @@ program part_1d
 		
 		close(21)
 		
-		si = si + npp
+		deallocate(pt)
 	end do
 	
 	do i=1, np
@@ -97,7 +106,7 @@ program part_1d
 		close(21)
 	end do
 	
-	print *, "send"
+	!print *, "send"
 	!送信すべき値
 	do i=1, np
 		write(fname, '(a,i2.2,".dat")') trim(prefix), i
@@ -124,7 +133,7 @@ program part_1d
 		end do
 	end do
 	
-	print *, "recv"
+	!print *, "recv"
 	ext = 0
 	pc = 0
 	!受信すべき値

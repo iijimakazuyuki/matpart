@@ -9,9 +9,9 @@ OBJECT =\
 	bitset.o\
 	array.o\
 	matcrs.o\
-	part_1d.o
+	part.o
 
-TARGET = part_1d.exe
+TARGET = part.exe
 
 $(TARGET): $(OBJECT)
 	$(FC) -o $@ $(OBJECT) $(FCFLAG)
